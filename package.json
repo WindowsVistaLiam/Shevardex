@@ -1,0 +1,15 @@
+{
+  "name": "shevardex-bot",
+  "version": "1.0.0",
+  "description": "Bot Discord pour le jeu de cartes Shevardex",
+  "main": "bot.js",
+  "scripts": {
+    "start":  "node bot.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "dependencies": {
+    "discord.js":    "^14.15.0",
+    "better-sqlite3":"^9.4.3",
+    "dotenv":        "^16.4.5"
+  }
+}
