@@ -22,7 +22,7 @@ function cardEmbed(card) {
     .setTitle(`${r.emoji} ${card.name}`)
     .setDescription(card.description || '*Aucune description.*')
     .addFields({ name: 'Rareté', value: r.label, inline: true });
-  if (card.image) embed.setImage(card.image);
+  if (card.image) embed.setImage('https://shevardex.zalax.xyz' + card.image);
   if (card.owner) embed.setFooter({ text: `Personnage de ${card.owner}` });
   return embed;
 }
