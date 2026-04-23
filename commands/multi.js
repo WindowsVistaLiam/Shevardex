@@ -5,7 +5,22 @@ const { getCurrentPulls, usePulls, getNextPullIn, formatDuration } = require('..
 const { rarityInfo } = require('../utils/embeds');
 const db = require('../database');
 
+// 🔒 anti double multi
 const activePulls = new Map();
+
+/**
+ * 🔥 Convertit une image locale en URL accessible
+ * IMPORTANT: adapte le domaine si besoin
+ */
+function getImageUrl(card) {
+  if (!card?.image) return null;
+
+  // déjà URL
+  if (card.image.startsWith('http')) return card.image;
+
+  // chemin local → URL publique
+  return `https://shevardex.zalax.xyz/${card.image}`;
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -15,6 +30,7 @@ module.exports = {
   async execute(interaction) {
     const userId = interaction.user.id;
 
+    // 🔒 anti spam / double execution
     if (activePulls.has(userId)) {
       return interaction.reply({
         content: "⏳ Tirage déjà en cours.",
@@ -36,7 +52,9 @@ module.exports = {
         });
       }
 
+      // 🔥 consommation pulls
       const used = usePulls(userId, pulls);
+
       const cardsData = readCards();
 
       const wish = db.prepare('SELECT card_id FROM wishes WHERE user_id = ?').get(userId);
@@ -47,21 +65,23 @@ module.exports = {
 
       const results = rollCards(cardsData, used, wishId, wishBoost);
 
+      // 🧹 delete wish
       if (wishId) {
         db.prepare('DELETE FROM wishes WHERE user_id = ?').run(userId);
       }
 
+      // 💾 save collection
       const insertStmt = db.prepare('INSERT INTO collection (user_id, card_id) VALUES (?, ?)');
+      for (const card of results) insertStmt.run(userId, card.id);
 
-      for (const card of results) {
-        insertStmt.run(userId, card.id);
-      }
-
-      results.sort(
-        (a, b) => rarityInfo(b.rarity).order - rarityInfo(a.rarity).order
+      // 🔥 tri rareté
+      results.sort((a, b) =>
+        rarityInfo(b.rarity).order - rarityInfo(a.rarity).order
       );
 
-      // 🔥 pages
+      // =========================
+      // 📦 PAGINATION
+      // =========================
       let page = 0;
 
       const buildEmbed = (i) => {
@@ -72,21 +92,19 @@ module.exports = {
           .setColor(r.color)
           .setTitle(card.name)
           .setDescription(`${r.emoji} **${r.label}**`)
-          .setImage(
-            card.image || card.img || card.url || null // 🔥 fallback safe
-          )
+          .setImage(getImageUrl(card)) // 🔥 FIX ICI
           .setFooter({ text: `Pull ${i + 1}/${results.length}` });
       };
 
       const buildButtons = (i) => new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setCustomId(`multi:prev:${userId}`)
+          .setCustomId('multi_prev')
           .setLabel('⬅️')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(i === 0),
 
         new ButtonBuilder()
-          .setCustomId(`multi:next:${userId}`)
+          .setCustomId('multi_next')
           .setLabel('➡️')
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(i === results.length - 1),
@@ -105,13 +123,13 @@ module.exports = {
       collector.on('collect', async (i) => {
         if (i.user.id !== userId) {
           return i.reply({
-            content: "❌ Ce tirage ne t'appartient pas.",
+            content: "❌ Pas ton tirage.",
             ephemeral: true
           });
         }
 
-        if (i.customId.includes('next')) page++;
-        if (i.customId.includes('prev')) page--;
+        if (i.customId === 'multi_next') page++;
+        if (i.customId === 'multi_prev') page--;
 
         await i.update({
           embeds: [buildEmbed(page)],
