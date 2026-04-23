@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { readCards }  = require('../utils/cards');
-const { rollCards }  = require('../utils/gacha');
+const { readCards } = require('../utils/cards');
+const { rollCards } = require('../utils/gacha');
 const { getCurrentPulls, usePulls, getNextPullIn, formatDuration } = require('../utils/player');
 const { rarityInfo } = require('../utils/embeds');
 const db = require('../database');
@@ -9,23 +9,22 @@ const db = require('../database');
 const activePulls = new Map();
 
 /**
- * 🔥 Convertit une image locale en URL accessible
- * IMPORTANT: adapte le domaine si besoin
+ * 🌐 URL image carte
  */
 function getImageUrl(card) {
   if (!card?.image) return null;
 
-  // déjà URL
   if (card.image.startsWith('http')) return card.image;
 
-  // chemin local → URL publique
-  return `https://shevardex.zalax.xyz/${card.image}`;
+  const baseUrl = 'https://shevardex.zalax.xyz';
+
+  return `${baseUrl}${card.image.startsWith('/') ? '' : '/'}${card.image}`;
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('multi')
-    .setDescription('Lance toutes vos invocations disponibles'),
+    .setDescription('Lance toutes vos invocations disponibles (max 10)'),
 
   async execute(interaction) {
     const userId = interaction.user.id;
@@ -41,7 +40,9 @@ module.exports = {
     activePulls.set(userId, true);
 
     try {
-      const pulls = getCurrentPulls(userId);
+      const maxPulls = 10;
+      const availablePulls = getCurrentPulls(userId);
+      const pulls = Math.min(availablePulls, maxPulls);
 
       if (pulls <= 0) {
         const secs = getNextPullIn(userId);
@@ -92,7 +93,7 @@ module.exports = {
           .setColor(r.color)
           .setTitle(card.name)
           .setDescription(`${r.emoji} **${r.label}**`)
-          .setImage(getImageUrl(card)) // 🔥 FIX ICI
+          .setImage(getImageUrl(card))
           .setFooter({ text: `Pull ${i + 1}/${results.length}` });
       };
 
@@ -112,8 +113,7 @@ module.exports = {
 
       const msg = await interaction.reply({
         embeds: [buildEmbed(page)],
-        components: [buildButtons(page)],
-        fetchReply: true
+        components: [buildButtons(page)]
       });
 
       const collector = msg.createMessageComponentCollector({
@@ -137,6 +137,12 @@ module.exports = {
         });
       });
 
+    } catch (err) {
+      console.error('[multi] Erreur:', err);
+      return interaction.reply({
+        content: "❌ Une erreur est survenue pendant le tirage.",
+        ephemeral: true,
+      });
     } finally {
       activePulls.delete(userId);
     }
