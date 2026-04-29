@@ -92,7 +92,7 @@ module.exports = {
         return new EmbedBuilder()
           .setColor(r.color)
           .setTitle(card.name)
-          .setDescription(`${r.emoji} **${r.label}**`)
+          .setDescription(`${r.emoji} **${r.label}\n\n${card.description}**`)
           .setImage(getImageUrl(card))
           .setFooter({ text: `Pull ${i + 1}/${results.length}` });
       };
